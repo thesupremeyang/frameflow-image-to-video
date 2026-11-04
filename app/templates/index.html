@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191b19">
+  <meta name="description" content="本地图片转视频工作台，支持 Seedance 与 MiniMax 官方云端模型。">
+  <title>帧流 · 图片转视频工作台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="帧流首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>帧流</span><span class="brand-en">FRAMEFLOW</span></a>
+    <div class="top-actions">
+      <div class="local-label"><span class="local-dot"></span>本地工作台<span class="header-divider"></span><span class="muted">图像，进入运动。</span></div>
+      <button id="open-config" class="config-button" type="button"><span>模型配置</span><i id="config-indicator" aria-hidden="true"></i></button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="intro">
+      <div><p class="kicker">IMAGE TO VIDEO</p><h1>让每一帧，<br>都有下一步。</h1></div>
+      <p class="intro-copy">上传一张图片，描述你想要的镜头。选择模型，剩下的交给云端。</p>
+    </section>
+
+    <div class="studio-grid">
+      <form id="generation-form" class="creator-panel" novalidate>
+        <div class="section-heading"><span class="section-index">01</span><h2>创作设置</h2><span class="section-note">首帧图生视频</span></div>
+
+        <div class="field-group">
+          <label for="image-input">首帧图片<span class="required">必需</span></label>
+          <label class="dropzone" id="dropzone" for="image-input">
+            <input id="image-input" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tiff,.tif,.gif,.heic,.heif,image/jpeg,image/png,image/webp,image/bmp,image/tiff,image/gif,image/heic,image/heif">
+            <span class="upload-symbol" aria-hidden="true">+</span>
+            <span class="upload-title">拖放图片到这里，或点击选择</span>
+            <span class="upload-help">最大 30 MB · JPG、PNG、WEBP 等</span>
+            <img id="image-preview" alt="已选择的首帧图片预览" hidden>
+            <span id="image-meta" class="image-meta" hidden></span>
+          </label>
+          <p id="image-error" class="field-error" role="alert" hidden></p>
+        </div>
+
+        <div class="field-group">
+          <div class="label-row"><label for="prompt">生成提示词<span class="required">必需</span></label><span id="prompt-count" class="counter">0 / 10000</span></div>
+          <textarea id="prompt" name="prompt" maxlength="10000" rows="5" placeholder="描述主体动作、镜头运动、环境变化和氛围。&#10;例如：镜头缓慢向前推进，微风拂动衣角，云层流动，电影感自然光。" required></textarea>
+          <p class="field-help">提示词将直接提交给视频模型，不会经过额外改写。</p>
+        </div>
+
+        <fieldset class="field-group model-field">
+          <legend>视频模型</legend>
+          <div id="model-options" class="model-options">
+            <label class="model-option selected"><input type="radio" name="model" value="seedance-2.5" checked><span class="model-copy"><strong>Seedance 2.5</strong><small>火山方舟 · 多模态视频</small></span><span class="model-check"></span></label>
+            <label class="model-option"><input type="radio" name="model" value="seedance-2.0"><span class="model-copy"><strong>Seedance 2.0</strong><small>火山方舟 · 稳定生成</small></span><span class="model-check"></span></label>
+            <label class="model-option"><input type="radio" name="model" value="minimax-h3"><span class="model-copy"><strong>MiniMax H3</strong><small>MiniMax · 高清动态</small></span><span class="model-check"></span></label>
+          </div>
+          <div class="config-line"><p id="config-notice" class="config-notice"></p><button id="config-notice-button" class="inline-config" type="button">打开配置</button></div>
+        </fieldset>
+
+        <div class="parameters">
+          <div class="field-group"><label for="duration">视频时长</label><div class="select-unit"><select id="duration" name="duration"></select><span>秒</span></div></div>
+          <div class="field-group"><label for="resolution">清晰度</label><select id="resolution" name="resolution"></select></div>
+        </div>
+        <label id="audio-row" class="switch-row"><span><strong>生成同步音频</strong><small>为画面添加匹配的环境声音</small></span><input id="generate-audio" name="generate_audio" type="checkbox" role="switch" checked><span class="switch-track" aria-hidden="true"></span></label>
+        <div class="ratio-note"><span>画幅比例</span><strong>自适应首帧图片</strong></div>
+
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+        <button id="submit-button" class="primary-button" type="submit"><span>开始生成视频</span><span aria-hidden="true">↗</span></button>
+        <p class="submit-note">生成将消耗所选平台的云端额度，请确保已开通模型。</p>
+      </form>
+
+      <section class="output-panel" aria-live="polite">
+        <div class="section-heading"><span class="section-index">02</span><h2>生成结果</h2><span id="output-status" class="status-badge idle">等待创作</span></div>
+        <div id="output-stage" class="output-stage empty">
+          <div id="output-empty" class="output-empty"><div class="frame-placeholder" aria-hidden="true"><span></span><i></i></div><h3>你的下一帧，从这里开始</h3><p>设置首帧和提示词后，生成的视频会显示在这里。</p></div>
+          <div id="output-processing" class="output-processing" hidden><div class="processing-visual"><img id="processing-image" alt="用于生成视频的首帧图片"><div class="scan-line"></div><span id="processing-state">正在提交任务</span></div><h3>正在让画面动起来</h3><p>视频生成需要一些时间，你可以继续编辑下一次创作。</p><div class="processing-steps"><span class="complete">提交任务</span><span id="step-cloud">云端生成</span><span>保存视频</span></div></div>
+          <div id="output-success" class="output-success" hidden><video id="result-video" controls playsinline preload="metadata"></video><div class="result-caption"><div><h3>创作完成</h3><p id="result-meta"></p></div><a id="download-button" class="download-button" href="#" download>下载 MP4<span aria-hidden="true">↓</span></a></div></div>
+          <div id="output-failed" class="output-failed" hidden><span class="error-symbol" aria-hidden="true">!</span><h3>这次没有生成成功</h3><p id="output-error"></p><button id="retry-button" class="secondary-button" type="button">返回修改并重试</button></div>
+        </div>
+        <div class="output-footer"><span>本地保存</span><span id="output-model">Seedance 2.5</span><span id="output-spec">5 秒 · 720p</span></div>
+      </section>
+    </div>
+
+    <section class="history-section">
+      <div class="history-heading"><h2>最近创作</h2><button id="clear-history" class="text-button" type="button" hidden>清空记录</button></div>
+      <p id="history-empty" class="history-empty">完成的创作会保存在这里，刷新页面也能继续查看。</p>
+      <div id="history-list" class="history-list"></div>
+    </section>
+  </main>
+  <footer class="footer"><span>帧流 · 在本地创作，于云端生成</span><span>密钥仅由本地服务端读取</span></footer>
+  <dialog id="clear-dialog"><h2>清空全部创作记录？</h2><p>这会删除本地数据库、上传图片和已下载的视频。云端任务与已产生的费用不受影响，此操作无法撤销。</p><div class="dialog-actions"><button id="cancel-clear" class="secondary-button" type="button">取消</button><button id="confirm-clear" class="danger-button" type="button">确认清空</button></div></dialog>
+
+  <dialog id="config-dialog" class="config-dialog">
+    <form id="config-form" novalidate>
+      <div class="config-dialog-head"><div><p class="kicker">SERVICE CONFIGURATION</p><h2>模型配置</h2><p>填写后立即生效，不需要修改文件或重启服务。</p></div><button id="close-config" class="icon-button" type="button" aria-label="关闭配置">×</button></div>
+      <div id="config-file-error" class="form-error" role="alert" hidden></div>
+      <div class="config-scroll">
+        <section class="config-section">
+          <div class="config-section-head"><h3>火山方舟</h3><span>Seedance 2.5 / 2.0</span></div>
+          <div class="config-grid">
+            <label class="config-field span-2"><span>火山方舟 API Key <b id="ark-key-state" class="secret-state">未配置</b></span><input id="ark-api-key" name="ark_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入火山方舟 API Key"></label>
+            <label class="config-field span-2"><span>接口地址</span><input id="ark-base-url" name="ark_base_url" type="url" spellcheck="false" required></label>
+            <label class="config-field"><span>Seedance 2.5 模型 ID</span><input id="seedance-25-model" name="seedance_25_model" type="text" spellcheck="false" required></label>
+            <label class="config-field"><span>Seedance 2.0 模型 ID</span><input id="seedance-20-model" name="seedance_20_model" type="text" spellcheck="false" required></label>
+          </div>
+        </section>
+
+        <section class="config-section">
+          <div class="config-section-head"><h3>MiniMax</h3><span>H3 模型</span></div>
+          <div class="config-grid">
+            <label class="config-field span-2"><span>MiniMax API Key <b id="minimax-key-state" class="secret-state">未配置</b></span><input id="minimax-api-key" name="minimax_api_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入 MiniMax API Key"></label>
+            <label class="config-field span-2"><span>接口地址</span><input id="minimax-base-url" name="minimax_base_url" type="url" spellcheck="false" required></label>
+            <label class="config-field span-2"><span>MiniMax H3 模型 ID</span><input id="minimax-model" name="minimax_model" type="text" spellcheck="false" required></label>
+          </div>
+        </section>
+
+        <section class="config-section">
+          <div class="config-section-head"><h3>S3 图片存储</h3><span>MiniMax 必需</span></div>
+          <p class="config-help">MiniMax 需要读取公开图片地址。这里填写你已有的 S3 兼容存储，图片会上传后交给 MiniMax。</p>
+          <div class="config-grid">
+            <label class="config-field span-2"><span>服务端点</span><input id="s3-endpoint-url" name="s3_endpoint_url" type="url" spellcheck="false" placeholder="https://... 可留空使用 AWS S3"></label>
+            <label class="config-field"><span>区域</span><input id="s3-region" name="s3_region" type="text" spellcheck="false" placeholder="auto"></label>
+            <label class="config-field"><span>存储桶</span><input id="s3-bucket" name="s3_bucket" type="text" spellcheck="false" placeholder="my-video-assets"></label>
+            <label class="config-field"><span>Access Key ID <b id="s3-access-state" class="secret-state">未配置</b></span><input id="s3-access-key-id" name="s3_access_key_id" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入存储访问密钥"></label>
+            <label class="config-field"><span>Secret Access Key <b id="s3-secret-state" class="secret-state">未配置</b></span><input id="s3-secret-access-key" name="s3_secret_access_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入存储私密密钥"></label>
+            <label class="config-field span-2"><span>公开访问地址</span><input id="s3-public-base-url" name="s3_public_base_url" type="url" spellcheck="false" placeholder="https://media.example.com"></label>
+            <label class="config-field span-2"><span>存储路径</span><input id="s3-prefix" name="s3_prefix" type="text" spellcheck="false" placeholder="frameflow"></label>
+          </div>
+        </section>
+      </div>
+      <div id="config-error" class="form-error" role="alert" hidden></div>
+      <div class="config-dialog-foot"><p>密钥仅保存在本机 data/settings.json，不会在页面回显，也不会发送到其他服务。</p><div><button id="cancel-config" class="secondary-button" type="button">取消</button><button id="save-config" class="primary-button dialog-save" type="submit"><span>保存配置</span></button></div></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
